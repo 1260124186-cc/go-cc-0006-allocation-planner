@@ -55,5 +55,6 @@ func (s *ReportSession) Close() error {
 		return nil
 	}
 	s.closed = true
+	s.audit.mu.Unlock()
 	return nil
 }
