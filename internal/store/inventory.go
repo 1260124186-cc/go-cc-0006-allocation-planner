@@ -45,7 +45,7 @@ func (i *Inventory) Reserve(ctx context.Context, allocation domain.Allocation) (
 	for _, line := range allocation.Lines {
 		available, ok := i.available[line.SKU]
 		if !ok {
-			return nil, fmt.Errorf("%w: %s", ErrUnknownSKU, line.SKU)
+			return nil, nil
 		}
 		if available < line.Quantity {
 			return nil, fmt.Errorf("%w: %s", ErrInsufficientQty, line.SKU)

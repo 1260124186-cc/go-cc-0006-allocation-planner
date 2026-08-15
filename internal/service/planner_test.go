@@ -84,3 +84,37 @@ func TestReportReleasesAuditSessionOnFailedSnapshot(t *testing.T) {
 		t.Fatalf("second Report() error = %v, want unlocked audit session", err)
 	}
 }
+
+func TestAllocateRejectsMissingReservation(t *testing.T) {
+	planner := service.NewPlanner(nilReservationInventory{}, successfulAudit{})
+	_, err := planner.Allocate(context.Background(), domain.Order{
+		ID: "order-4", Lines: []domain.Line{{SKU: "book", Quantity: 1}},
+	})
+	if !errors.Is(err, service.ErrMissingReservation) {
+		t.Fatalf("Allocate() error = %v, want missing reservation", err)
+	}
+}
+
+type nilReservationInventory struct{}
+
+func (nilReservationInventory) Reserve(context.Context, domain.Allocation) (*domain.Allocation, error) {
+	return nil, nil
+}
+
+func (nilReservationInventory) Release(context.Context, domain.Allocation) error {
+	return nil
+}
+
+func (nilReservationInventory) Snapshot(context.Context) (map[string]int, error) {
+	return map[string]int{}, nil
+}
+
+type successfulAudit struct{}
+
+func (successfulAudit) Record(context.Context, domain.Allocation) error {
+	return nil
+}
+
+func (successfulAudit) OpenReport(context.Context) (domain.ReportSession, error) {
+	return nil, nil
+}
