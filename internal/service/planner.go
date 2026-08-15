@@ -35,6 +35,9 @@ func (p *Planner) Allocate(ctx context.Context, order domain.Order) (domain.Allo
 	if err != nil {
 		return domain.Allocation{}, err
 	}
+	if reservation == nil {
+		return domain.Allocation{}, ErrMissingReservation
+	}
 	if err := p.audit.Record(ctx, *reservation); err != nil {
 		if releaseErr := p.inventory.Release(context.Background(), *reservation); releaseErr != nil {
 			return domain.Allocation{}, errors.Join(err, releaseErr)

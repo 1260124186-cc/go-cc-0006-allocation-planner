@@ -30,6 +30,28 @@ func TestAllocateMergesDuplicateLines(t *testing.T) {
 	}
 }
 
+func TestAllocateRejectsUnknownSKUWithoutChangingInventory(t *testing.T) {
+	inventory := store.NewMemoryInventory(map[string]int{"book": 1})
+	planner := service.NewPlanner(inventory, store.NewMemoryAudit())
+
+	allocation, err := planner.Allocate(context.Background(), domain.Order{
+		ID: "order-unknown", Lines: []domain.Line{{SKU: "pen", Quantity: 1}},
+	})
+	if !errors.Is(err, store.ErrUnknownSKU) {
+		t.Fatalf("Allocate() error = %v, want unknown SKU", err)
+	}
+	if allocation.ID != "" || allocation.OrderID != "" || allocation.CreatedAt != "" || len(allocation.Lines) != 0 {
+		t.Fatalf("Allocate() allocation = %#v, want empty allocation", allocation)
+	}
+	snapshot, snapshotErr := inventory.Snapshot(context.Background())
+	if snapshotErr != nil {
+		t.Fatalf("Snapshot() error = %v", snapshotErr)
+	}
+	if snapshot["book"] != 1 {
+		t.Fatalf("available book = %d, want 1", snapshot["book"])
+	}
+}
+
 func TestAllocateReleasesStockWhenAuditFails(t *testing.T) {
 	inventory := store.NewMemoryInventory(map[string]int{"book": 2})
 	audit := store.NewMemoryAudit()

@@ -15,6 +15,13 @@ func TestReserveUnknownSKUReturnsError(t *testing.T) {
 	if !errors.Is(err, ErrUnknownSKU) {
 		t.Fatalf("Reserve() error = %v, want unknown SKU", err)
 	}
+	snapshot, snapshotErr := inventory.Snapshot(context.Background())
+	if snapshotErr != nil {
+		t.Fatalf("Snapshot() error = %v", snapshotErr)
+	}
+	if snapshot["book"] != 1 {
+		t.Fatalf("available book = %d, want 1", snapshot["book"])
+	}
 }
 
 func TestReleaseRestoresAvailability(t *testing.T) {
