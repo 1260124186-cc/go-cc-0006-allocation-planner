@@ -19,6 +19,7 @@ type Inventory struct {
 	mu            sync.Mutex
 	available     map[string]int
 	reservations  map[string]domain.Allocation
+	now           func() time.Time
 	CommitDelay   time.Duration
 	SnapshotDelay time.Duration
 }
@@ -31,6 +32,7 @@ func NewMemoryInventory(items map[string]int) *Inventory {
 	return &Inventory{
 		available:    available,
 		reservations: make(map[string]domain.Allocation),
+		now:          time.Now,
 	}
 }
 
@@ -41,6 +43,12 @@ func (i *Inventory) Reserve(ctx context.Context, allocation domain.Allocation) (
 
 	i.mu.Lock()
 	defer i.mu.Unlock()
+
+	// context.WithTimeout 的取消由后台 goroutine 异步触发，ctx.Err() 在 deadline
+	// 到期瞬间可能仍为 nil；用 deadline 时间戳做确定性比较，已超时则绝不扣减。
+	if err := contextExpired(ctx, i.now); err != nil {
+		return nil, err
+	}
 
 	for _, line := range allocation.Lines {
 		available, ok := i.available[line.SKU]
@@ -53,6 +61,13 @@ func (i *Inventory) Reserve(ctx context.Context, allocation domain.Allocation) (
 	}
 	for _, line := range allocation.Lines {
 		i.available[line.SKU] -= line.Quantity
+	}
+	// 扣减后再次确认：若 ctx 在扣减期间被取消，则立即回滚，不留库存扣减或预留
+	if err := contextExpired(ctx, i.now); err != nil {
+		for _, line := range allocation.Lines {
+			i.available[line.SKU] += line.Quantity
+		}
+		return nil, err
 	}
 	i.reservations[allocation.ID] = allocation
 	copy := allocation
@@ -77,11 +92,12 @@ func (i *Inventory) Snapshot(ctx context.Context) (map[string]int, error) {
 	if err := waitForCommit(ctx, i.SnapshotDelay); err != nil {
 		return nil, err
 	}
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
 	i.mu.Lock()
 	defer i.mu.Unlock()
+
+	if err := contextExpired(ctx, i.now); err != nil {
+		return nil, err
+	}
 
 	snapshot := make(map[string]int, len(i.available))
 	for sku, quantity := range i.available {
@@ -91,9 +107,32 @@ func (i *Inventory) Snapshot(ctx context.Context) (map[string]int, error) {
 }
 
 func waitForCommit(ctx context.Context, delay time.Duration) error {
-	if delay == 0 {
-		return nil
+	if delay <= 0 {
+		return ctx.Err()
 	}
-	time.Sleep(delay)
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+		// timer 与 ctx.Done 同时就绪时 select 可能选中本分支，ctx 此刻是否已取消
+		// 由调用方在提交前用 contextExpired 做确定性判定，这里只需返回 nil
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+// contextExpired 判定 ctx 是否已取消/超时。
+// context.WithTimeout 的取消由后台 goroutine 异步触发，ctx.Err() 在 deadline
+// 到期瞬间可能仍为 nil，导致竞态下误提交。这里优先用 deadline 时间戳做确定性比较：
+// 已过 deadline 即视为超时，不依赖异步的 ctx.Err()。手动 WithCancel 无 deadline，
+// 其 cancel 是同步的，ctx.Err() 对它可靠，故回退到 ctx.Err()。
+func contextExpired(ctx context.Context, now func() time.Time) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if deadline, ok := ctx.Deadline(); ok && now().After(deadline) {
+		return context.DeadlineExceeded
+	}
 	return nil
 }
