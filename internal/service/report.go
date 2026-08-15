@@ -11,10 +11,10 @@ func (p *Planner) Report(ctx context.Context) (domain.Report, error) {
 	if err != nil {
 		return domain.Report{}, err
 	}
-	defer session.Close()
 
 	if _, err := p.inventory.Snapshot(ctx); err != nil {
 		return domain.Report{}, err
 	}
-	return session.Build(), nil
+	report := session.Build()
+	return report, session.Close()
 }
