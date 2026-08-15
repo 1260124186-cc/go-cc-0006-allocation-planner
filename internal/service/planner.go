@@ -29,8 +29,12 @@ func (p *Planner) Allocate(ctx context.Context, order domain.Order) (domain.Allo
 	if len(lines) == 0 {
 		return domain.Allocation{}, fmt.Errorf("order must contain at least one line")
 	}
+	normalized, err := domain.NormalizeLines(lines)
+	if err != nil {
+		return domain.Allocation{}, err
+	}
 
-	allocation := domain.NewAllocation(order.ID, lines, p.now())
+	allocation := domain.NewAllocation(order.ID, normalized, p.now())
 	reservation, err := p.inventory.Reserve(ctx, allocation)
 	if err != nil {
 		return domain.Allocation{}, err
