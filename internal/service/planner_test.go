@@ -36,9 +36,10 @@ func TestAllocateReleasesStockWhenAuditFails(t *testing.T) {
 	audit.FailFor["order-2"] = errors.New("audit offline")
 	planner := service.NewPlanner(inventory, audit)
 
-	_, err := planner.Allocate(context.Background(), domain.Order{
+	order := domain.Order{
 		ID: "order-2", Lines: []domain.Line{{SKU: "book", Quantity: 2}},
-	})
+	}
+	_, err := planner.Allocate(context.Background(), order)
 	if err == nil {
 		t.Fatal("Allocate() error = nil, want audit error")
 	}
@@ -48,6 +49,11 @@ func TestAllocateReleasesStockWhenAuditFails(t *testing.T) {
 	}
 	if snapshot["book"] != 2 {
 		t.Fatalf("available book = %d, want 2", snapshot["book"])
+	}
+
+	delete(audit.FailFor, order.ID)
+	if _, err := planner.Allocate(context.Background(), order); err != nil {
+		t.Fatalf("retry Allocate() error = %v, want successful allocation", err)
 	}
 }
 

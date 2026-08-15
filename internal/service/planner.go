@@ -39,6 +39,10 @@ func (p *Planner) Allocate(ctx context.Context, order domain.Order) (domain.Allo
 		return domain.Allocation{}, ErrMissingReservation
 	}
 	if err := p.audit.Record(ctx, *reservation); err != nil {
+		// A reservation is only complete once it is durably recorded.
+		if releaseErr := p.inventory.Release(context.WithoutCancel(ctx), *reservation); releaseErr != nil {
+			return domain.Allocation{}, errors.Join(err, fmt.Errorf("release inventory reservation: %w", releaseErr))
+		}
 		return domain.Allocation{}, err
 	}
 	return *reservation, nil
