@@ -66,9 +66,6 @@ func (i *Inventory) Release(_ context.Context, allocation domain.Allocation) err
 	if _, ok := i.reservations[allocation.ID]; !ok {
 		return fmt.Errorf("allocation %s is not reserved", allocation.ID)
 	}
-	for _, line := range allocation.Lines {
-		i.available[line.SKU] += line.Quantity
-	}
 	delete(i.reservations, allocation.ID)
 	return nil
 }
