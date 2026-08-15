@@ -55,5 +55,7 @@ func (s *ReportSession) Close() error {
 		return nil
 	}
 	s.closed = true
+	// OpenReport 持有审计锁，释放职责委托给 Close。
+	s.audit.mu.Unlock()
 	return nil
 }
