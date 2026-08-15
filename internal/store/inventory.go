@@ -92,14 +92,8 @@ func (i *Inventory) Snapshot(ctx context.Context) (map[string]int, error) {
 
 func waitForCommit(ctx context.Context, delay time.Duration) error {
 	if delay == 0 {
-		return ctx.Err()
-	}
-	timer := time.NewTimer(delay)
-	defer timer.Stop()
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-timer.C:
 		return nil
 	}
+	time.Sleep(delay)
+	return nil
 }
