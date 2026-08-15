@@ -1,0 +1,13 @@
+{
+  "inventory": {
+    "book": 8,
+    "pen": 12
+  },
+  "order": {
+    "id": "sample-order",
+    "lines": [
+      {"sku": "book", "quantity": 2},
+      {"sku": "pen", "quantity": 1}
+    ]
+  }
+}
