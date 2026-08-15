@@ -58,11 +58,15 @@ func TestAllocateHonorsCanceledContext(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
 	defer cancel()
 
+	started := time.Now()
 	_, err := planner.Allocate(ctx, domain.Order{
 		ID: "order-3", Lines: []domain.Line{{SKU: "book", Quantity: 1}},
 	})
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("Allocate() error = %v, want context deadline", err)
+	}
+	if elapsed := time.Since(started); elapsed > 40*time.Millisecond {
+		t.Fatalf("Allocate() returned after %s, want prompt cancellation", elapsed)
 	}
 	snapshot, _ := inventory.Snapshot(context.Background())
 	if snapshot["book"] != 1 {
