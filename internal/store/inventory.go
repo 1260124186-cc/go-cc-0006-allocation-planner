@@ -38,9 +38,15 @@ func (i *Inventory) Reserve(ctx context.Context, allocation domain.Allocation) (
 	if err := waitForCommit(ctx, i.CommitDelay); err != nil {
 		return nil, err
 	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 
 	i.mu.Lock()
 	defer i.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 
 	for _, line := range allocation.Lines {
 		available, ok := i.available[line.SKU]
@@ -92,8 +98,16 @@ func (i *Inventory) Snapshot(ctx context.Context) (map[string]int, error) {
 
 func waitForCommit(ctx context.Context, delay time.Duration) error {
 	if delay == 0 {
+		return ctx.Err()
+	}
+
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
 		return nil
 	}
-	time.Sleep(delay)
-	return nil
 }

@@ -31,16 +31,30 @@ func (p *Planner) Allocate(ctx context.Context, order domain.Order) (domain.Allo
 	}
 
 	allocation := domain.NewAllocation(order.ID, lines, p.now())
-	reservation, err := p.inventory.Reserve(context.Background(), allocation)
+	reservation, err := p.inventory.Reserve(ctx, allocation)
 	if err != nil {
 		return domain.Allocation{}, err
 	}
 	if reservation == nil {
 		return domain.Allocation{}, ErrMissingReservation
 	}
-	if err := p.audit.Record(context.Background(), *reservation); err != nil {
+	if err := ctx.Err(); err != nil {
 		if releaseErr := p.inventory.Release(context.Background(), *reservation); releaseErr != nil {
 			return domain.Allocation{}, errors.Join(err, releaseErr)
+		}
+		return domain.Allocation{}, err
+	}
+	if err := p.audit.Record(ctx, *reservation); err != nil {
+		if releaseErr := p.inventory.Release(context.Background(), *reservation); releaseErr != nil {
+			return domain.Allocation{}, errors.Join(err, releaseErr)
+		}
+		return domain.Allocation{}, err
+	}
+	if err := ctx.Err(); err != nil {
+		auditErr := p.audit.Remove(context.Background(), *reservation)
+		releaseErr := p.inventory.Release(context.Background(), *reservation)
+		if cleanupErr := errors.Join(auditErr, releaseErr); cleanupErr != nil {
+			return domain.Allocation{}, errors.Join(err, cleanupErr)
 		}
 		return domain.Allocation{}, err
 	}

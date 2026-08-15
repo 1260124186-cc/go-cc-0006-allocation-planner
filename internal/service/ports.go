@@ -14,5 +14,6 @@ type InventoryStore interface {
 
 type AuditStore interface {
 	Record(context.Context, domain.Allocation) error
+	Remove(context.Context, domain.Allocation) error
 	OpenReport(context.Context) (domain.ReportSession, error)
 }
