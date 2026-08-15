@@ -16,7 +16,15 @@ type Line struct {
 }
 
 func NormalizeLines(lines []Line) ([]Line, error) {
-	normalized := append([]Line(nil), lines...)
+	quantities := make(map[string]int, len(lines))
+	for _, line := range lines {
+		quantities[line.SKU] += line.Quantity
+	}
+
+	normalized := make([]Line, 0, len(quantities))
+	for sku, quantity := range quantities {
+		normalized = append(normalized, Line{SKU: sku, Quantity: quantity})
+	}
 	sort.Slice(normalized, func(i, j int) bool {
 		return normalized[i].SKU < normalized[j].SKU
 	})

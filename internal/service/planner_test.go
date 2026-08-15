@@ -30,6 +30,30 @@ func TestAllocateMergesDuplicateLines(t *testing.T) {
 	}
 }
 
+func TestAllocateRejectsDuplicateLinesWhenCombinedQuantityExceedsStock(t *testing.T) {
+	inventory := store.NewMemoryInventory(map[string]int{"book": 2})
+	planner := service.NewPlanner(inventory, store.NewMemoryAudit())
+
+	_, err := planner.Allocate(context.Background(), domain.Order{
+		ID: "order-duplicate-shortage",
+		Lines: []domain.Line{
+			{SKU: "book", Quantity: 1},
+			{SKU: "book", Quantity: 2},
+		},
+	})
+	if !errors.Is(err, store.ErrInsufficientQty) {
+		t.Fatalf("Allocate() error = %v, want insufficient quantity", err)
+	}
+
+	snapshot, snapshotErr := inventory.Snapshot(context.Background())
+	if snapshotErr != nil {
+		t.Fatalf("Snapshot() error = %v", snapshotErr)
+	}
+	if snapshot["book"] != 2 {
+		t.Fatalf("available book = %d, want 2", snapshot["book"])
+	}
+}
+
 func TestAllocateReleasesStockWhenAuditFails(t *testing.T) {
 	inventory := store.NewMemoryInventory(map[string]int{"book": 2})
 	audit := store.NewMemoryAudit()

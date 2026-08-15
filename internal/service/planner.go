@@ -25,9 +25,12 @@ func (p *Planner) Allocate(ctx context.Context, order domain.Order) (domain.Allo
 	if order.ID == "" {
 		return domain.Allocation{}, fmt.Errorf("order ID is required")
 	}
-	lines := append([]domain.Line(nil), order.Lines...)
-	if len(lines) == 0 {
+	if len(order.Lines) == 0 {
 		return domain.Allocation{}, fmt.Errorf("order must contain at least one line")
+	}
+	lines, err := domain.NormalizeLines(order.Lines)
+	if err != nil {
+		return domain.Allocation{}, err
 	}
 
 	allocation := domain.NewAllocation(order.ID, lines, p.now())
